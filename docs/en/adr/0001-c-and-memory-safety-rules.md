@@ -62,7 +62,10 @@ each enforced by a machine check.
    `execvp`, and `_exit`s. Its error report is a `write` of fixed text; no
    `printf` family.
 6. **Signal handlers** exist only for the five synchronous signals (ADR-0002),
-   call nothing but `sigaction`, and touch only their own automatic variables.
+   call nothing but `sigaction`, and touch only their own automatic variables
+   and the signal module's `volatile sig_atomic_t` arrival counters, indexed
+   only after a range check. (Amended 2026-09-29 with ADR-0002 revision 3,
+   which needs the counters; originally: automatic variables only.)
 
 ### Enforcement: five layers
 
@@ -86,6 +89,26 @@ Under `-fbounds-safety`, `main` takes
 lies outside the counted range, so the single call that hands the command's
 argument vector to `execvp` uses `__unsafe_forge_null_terminated`. No other
 `__unsafe_*` construct is allowed.
+
+### Writing under `-fbounds-safety` (measured 2026-09-29)
+
+Accepted without any `__unsafe_*` construct:
+
+- assigning `SIG_IGN`, `SIG_DFL` or a handler directly to `sa_handler`;
+- passing string literals and `argv` elements to `const char *` parameters;
+- `strcmp` on `argv` elements;
+- `snprintf` into a local array, then `write(fd, buf, (size_t)n)` with the
+  checked count.
+
+Rejected, and therefore avoided (each would need an `__unsafe_*` conversion):
+
+- passing a local `char` array to a `const char *` parameter, which bounds
+  safety treats as null-terminated — pass the array with its length as
+  `const char *__counted_by(len)` instead;
+- passing `SIG_IGN`/`SIG_DFL` through a function-pointer parameter — pass a
+  selector (an enum) and assign inside;
+- returning a counted buffer as `const char *` — write into the caller's
+  buffer and return nothing.
 
 ## Consequences
 

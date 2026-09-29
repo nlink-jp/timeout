@@ -184,7 +184,7 @@ Signals fall into three groups.
 | Group | Setting in the parent | Why |
 |---|---|---|
 | The forwarding set (except the five synchronous ones below), the `-s` signal, SIGCHLD | **default, blocked** | If ignored, a signal sent to the child between fork and the restoration of its dispositions is discarded by XNU at generation (292 of 300 lost — measured). Blocked with the default action, it stays pending in the child and is delivered once the child has restored its dispositions and unblocked |
-| The five that can arise synchronously (SEGV BUS ILL TRAP FPE) | a minimal `SA_SIGINFO` handler | Ignored or blocked, a bug in timeout itself (a NULL dereference, a `-fbounds-safety` trap = SIGTRAP) makes it spin, never timing out or exiting (measured). The handler decides by `si_code`: a signal sent from outside (`SI_USER` etc.) returns at once (kqueue has recorded it, so it is forwarded); a real fault resets the action to default and returns (the fault recurs and kills the process). The handler calls nothing but `sigaction` |
+| The five that can arise synchronously (SEGV BUS ILL TRAP FPE) | a minimal counting handler | Ignored or blocked, a bug in timeout itself (a NULL dereference, a `-fbounds-safety` trap = SIGTRAP) makes it spin, never timing out or exiting (measured). macOS gives a signal sent with `kill` the same siginfo as a real fault (measured), so the handler counts arrivals per main-loop epoch and restores the default action only at the 8th within one epoch: a real fault re-executes at once and dies; a sent signal lets the main loop run, which forwards it and re-arms the handler (ADR-0002 revision 3). The handler calls nothing but `sigaction` |
 | SIGTTIN / SIGTTOU | ignored | required by the standard |
 
 - The child, still blocked, restores the inherited dispositions, then restores
@@ -255,7 +255,8 @@ below). No single layer is enough.
   and `_exit`s. Errors are reported with `write` and fixed text, never through
   `printf`.
 - **Signal handlers** (the five synchronous ones only) call nothing but
-  `sigaction` and touch nothing but their automatic variables.
+  `sigaction` and touch nothing but their automatic variables and the
+  `volatile sig_atomic_t` arrival counters (ADR-0001 rule 6, amended).
 
 **Mechanical enforcement (five layers)**
 
@@ -300,6 +301,10 @@ Accepted residual risks (recorded with reasons in an ADR before implementation):
    - A command run from a script that reads the terminal is stopped by SIGTTIN,
      and the terminal's Ctrl-C does not reach it. Same as GNU. The README
      explains when to use `-f`.
+4. Eight sends of the same synchronous signal (SEGV BUS ILL TRAP FPE) within
+   one main-loop iteration are taken for a real fault, and timeout dies by it
+   without forwarding. Measured: no burst of 20 sends at 0–200 µs reached it
+   (added with ADR-0002 revision 3).
 
 ### Out of scope
 
@@ -322,7 +327,7 @@ workaround used in agent operation.
 - ADR-0002 How signals are received (the three groups, kqueue) and how inherited
   dispositions are restored
 - ADR-0003 Precedence between POSIX and GNU, and the table of known differences
-- ADR-0004 Residual risks 1–3
+- ADR-0004 Residual risks 1–4
 - ADR-0005 Time (asleep not counted, edge values, the upper limit)
 
 ### Phase 1: Core
@@ -493,3 +498,13 @@ No external services. macOS (XNU) constraints:
 - **Design verification stops after two passes (2026-09-29, approved by the
   user)**: the findings got lighter and what remains is settled by experiment, so
   it moves to Phase 0 (ADRs) and the Phase 1 experiments.
+- **Phase 1 experiments (2026-09-29)**: the first run passed its criteria, but
+  its log showed that macOS gives a SEGV sent with `kill` the same siginfo as a
+  real NULL dereference, so the handler's `si_code` test was void and criterion
+  3 too weak. Revision 2 (always reset, re-arm in the main loop) failed the
+  strengthened criterion: 2 sends 10 µs apart killed timeout once in 200. The
+  user chose revision 3 (count arrivals per main-loop epoch, reset at the 8th),
+  which passed every criterion (0/1000 at each gap) and survived every burst
+  of 20 sends; the remaining case is residual risk 4. ADR-0001 rule 6 amended to
+  allow the counters; ADR-0001 also records which idioms `-fbounds-safety`
+  accepts.

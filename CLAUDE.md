@@ -21,15 +21,18 @@ behind it are the ADRs in `docs/{en,ja}/adr/`.
   - no dynamic allocation;
   - check `isfinite` and the range before any `double` → integer conversion;
   - the forked child only restores signal state, calls `execvp` and `_exit`s;
-  - signal handlers exist only for the five synchronous signals and call
-    nothing but `sigaction`.
+  - signal handlers exist only for the five synchronous signals, call
+    nothing but `sigaction`, and touch only their automatic variables and the
+    `volatile sig_atomic_t` arrival counters.
 - **Never weaken a safety layer to make code compile.** A warning, an analyzer
   finding, a bounds trap or a sanitizer report is a bug in the code. The only
   sanctioned bounds exception is the `execvp` call (ADR-0001).
 - **Signal handling follows ADR-0002** (three groups: blocked default +
-  kqueue, minimal handler for the synchronous five, ignored TTIN/TTOU). Do not
-  set a forwarded signal to `SIG_IGN` in the parent: signals sent to a
-  just-forked child are then lost.
+  kqueue, a counting handler for the synchronous five, ignored TTIN/TTOU). Do
+  not set a forwarded signal to `SIG_IGN` in the parent: signals sent to a
+  just-forked child are then lost. Do not tell a sent signal from a fault by
+  `siginfo`: macOS gives both the same. A change to signal handling reruns
+  `experiments/adr-0002/run.sh` and keeps its log.
 - **Tests with every change**, run with `make test` (never `go test` alone —
   it fails without `TIMEOUT_BIN` by design). A new check needs a positive
   control that fails without it.

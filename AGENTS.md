@@ -32,6 +32,7 @@ timeout/
 ├── src/main.c              # the utility
 ├── e2e/                    # Go tests that drive the built binary (TIMEOUT_BIN)
 ├── tests/controls/         # one planted bug per safety layer + run.sh
+├── experiments/adr-0002/   # signal-handling experiments (probe.c, run.sh) and their raw logs
 ├── scripts/                # vendored org templates (signing, notarize, brew) — do not edit
 ├── docs/{en,ja}/           # RFP and ADRs
 └── Makefile
@@ -58,6 +59,13 @@ timeout/
 - **Signals sent to a child right after fork are lost if the parent ignores
   them**, and **ignoring a synchronous signal makes a real fault spin**
   (measured) — the reasons for ADR-0002's three groups.
+- **macOS gives a SEGV sent with `kill` the same siginfo as a real NULL
+  dereference** (`si_code=2`, `si_pid=0`, `si_addr=0x0`). The synchronous
+  handler therefore counts arrivals per main-loop epoch and resets at the 8th
+  (ADR-0002 revision 3); the main loop must start a new epoch after every
+  `kevent` return and re-arm the handler after forwarding.
+- `experiments/adr-0002/run.sh` takes minutes (thousands of forks); run it in
+  the background. Its logs are timestamped and never overwritten.
 - Whether a core file was written cannot be observed from outside on this Mac
   (`/cores` is root-only, and even a control shows no core flag), so core
   suppression must be checked by a unit test, not an e2e test.

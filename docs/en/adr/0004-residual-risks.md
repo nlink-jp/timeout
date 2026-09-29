@@ -36,6 +36,16 @@ documented in the README where a user would meet it.
      stopped by SIGTTIN, and the terminal's Ctrl-C does not reach it. `-f`
      avoids both, at the cost of not timing out descendants. Same as GNU.
 
+4. **A flood of one synchronous signal can kill timeout unforwarded.** macOS
+   gives a SEGV, BUS, ILL, TRAP or FPE sent with `kill` the same siginfo as a
+   real fault, so the handler recognises a fault by 8 arrivals within one
+   main-loop iteration (ADR-0002). Eight sends of the same one of these five
+   landing within one iteration are taken for a fault: timeout dies by that
+   signal without forwarding it, and the child is left as in risk 2. Measured:
+   0 of 200 bursts of 20 sends died at any gap from 0 to 200 µs. Sending these
+   five signals to timeout at all is unusual. (Added 2026-09-29 with ADR-0002
+   revision 3.)
+
 Risk 3's first point is pinned by an e2e test, so a change in behaviour is
 visible.
 

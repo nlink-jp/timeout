@@ -55,7 +55,9 @@ Apple clang 21 で、わざとバグを入れたコードに対して各安全�
 5. **fork 後の子**はシグナル設定と mask の復元、`execvp`、`_exit` だけを行う。エラーの報告は
    固定の文言の `write` で行い、`printf` 系を呼ばない。
 6. **シグナルハンドラ**は同期で起きうる 5 種（ADR-0002）にだけ置き、`sigaction` 以外を呼ばず、
-   自分の自動変数以外に触れない。
+   自分の自動変数と、シグナル処理部の `volatile sig_atomic_t` の到着回数記録（添字は範囲を
+   検査してから使う）以外に触れない。（2026-09-29、回数記録を必要とする ADR-0002 第 3 版に
+   あわせて改訂。当初は「自動変数以外に触れない」。）
 
 ### 強制: 5 層
 
@@ -76,6 +78,22 @@ Apple clang 21 で、わざとバグを入れたコードに対して各安全�
 `-fbounds-safety` の下で `main` は `char *__null_terminated *__counted_by(argc) argv` を受け取る。
 `argv[argc]` の NULL は数えた範囲の外なので、コマンドの引数列を `execvp` へ渡す 1 か所だけは
 `__unsafe_forge_null_terminated` を使う。それ以外の `__unsafe_*` は使わない。
+
+### `-fbounds-safety` の下での書き方（2026-09-29 実測）
+
+`__unsafe_*` を使わずに通るもの:
+
+- `SIG_IGN`・`SIG_DFL`・ハンドラを `sa_handler` へ直接代入する。
+- 文字列リテラルと `argv` の要素を `const char *` の引数へ渡す。
+- `argv` の要素に `strcmp` を使う。
+- ローカル配列へ `snprintf` し、検査した長さで `write(fd, buf, (size_t)n)` する。
+
+拒否されるので避けるもの（どれも `__unsafe_*` の変換が要る）:
+
+- ローカルの `char` 配列を `const char *` の引数へ渡す — 境界検査はこれを NUL 終端として扱う。
+  配列は長さつきの `const char *__counted_by(len)` で渡す。
+- `SIG_IGN`/`SIG_DFL` を関数ポインタの引数で渡す — 選択子（enum）を渡し、中で代入する。
+- 長さつきのバッファを `const char *` として返す — 呼び出し側のバッファへ書き、何も返さない。
 
 ## Consequences
 
