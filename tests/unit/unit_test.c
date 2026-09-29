@@ -5,12 +5,17 @@
  */
 #include <ptrcheck.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include "../../src/duration.h"
 #include "../../src/signames.h"
+#include "../../src/sigstate.h"
 
 static int failures = 0;
 
@@ -216,10 +221,81 @@ static void stress(int rounds)
 	printf("stress: %d rounds, %d invariant violations\n", rounds, bad);
 }
 
+/* ---- self-termination (ADR-0002) ------------------------------------ */
+
+/* In a child: make TERM pending, prepare to terminate by USR1, and report
+ * each property as a bit of the exit status (0 = all hold). */
+static int prepare_properties(void)
+{
+	sigset_t term = {0};
+	sigemptyset(&term);
+	sigaddset(&term, SIGTERM);
+	sigaddset(&term, SIGUSR1);
+	sigprocmask(SIG_BLOCK, &term, NULL);
+	kill(getpid(), SIGTERM);
+	struct rlimit big = { RLIM_INFINITY, RLIM_INFINITY };
+	(void)setrlimit(RLIMIT_CORE, &big);
+
+	if (sig_record_inherited() != 0)
+		return 64;
+	sig_prepare_self_termination(SIGUSR1);
+
+	int bad = 0;
+	struct rlimit rl = {0};
+	if (getrlimit(RLIMIT_CORE, &rl) != 0 || rl.rlim_cur != 0)
+		bad |= 1;
+	struct sigaction sa = {0};
+	if (sigaction(SIGUSR1, NULL, &sa) != 0 || sa.sa_handler != SIG_DFL)
+		bad |= 2;
+	sigset_t mask = {0}, pending = {0};
+	sigprocmask(SIG_SETMASK, NULL, &mask);
+	if (sigismember(&mask, SIGUSR1))
+		bad |= 4;
+	sigpending(&pending);
+	if (sigismember(&pending, SIGTERM))
+		bad |= 8;
+	return bad;
+}
+
+static void test_self_termination(void)
+{
+	pid_t pid = fork();
+	if (pid == 0)
+		_exit(prepare_properties());
+	int st = 0;
+	waitpid(pid, &st, 0);
+	if (!WIFEXITED(st) || WEXITSTATUS(st) != 0) {
+		printf("FAIL sig_prepare_self_termination: status %d (bits: 1 core limit, "
+		       "2 default action, 4 still blocked, 8 other signal still pending)\n",
+		       WIFEXITED(st) ? WEXITSTATUS(st) : -1);
+		failures++;
+	}
+
+	/* The whole procedure: ends by USR1 although TERM is pending. */
+	pid = fork();
+	if (pid == 0) {
+		sigset_t set = {0};
+		sigemptyset(&set);
+		sigaddset(&set, SIGTERM);
+		sigaddset(&set, SIGUSR1);
+		sigprocmask(SIG_BLOCK, &set, NULL);
+		kill(getpid(), SIGTERM);
+		(void)sig_record_inherited();
+		sig_self_terminate(SIGUSR1);
+	}
+	st = 0;
+	waitpid(pid, &st, 0);
+	if (!WIFSIGNALED(st) || WTERMSIG(st) != SIGUSR1 || WCOREDUMP(st)) {
+		printf("FAIL sig_self_terminate(SIGUSR1): wait status 0x%x\n", (unsigned)st);
+		failures++;
+	}
+}
+
 int main(void)
 {
 	test_duration_table();
 	test_signal_table();
+	test_self_termination();
 	stress(200000);
 	printf("%s: %d failure(s)\n", failures ? "FAIL" : "PASS", failures);
 	return failures ? 1 : 0;

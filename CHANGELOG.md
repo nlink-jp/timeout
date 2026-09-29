@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.1.0] - Unreleased
 
+### Added
+
+- `timeout [-fpv] [-k DURATION] [-s SIGNAL] DURATION COMMAND [ARG]...`, following
+  POSIX.1-2024 with the GNU long options (`--foreground`, `--kill-after`,
+  `--preserve-status`, `--signal`, `--verbose`, `--help`, `--version`).
+- Descendants timed out through a process group of its own; SIGCONT after the
+  signal; every terminating signal forwarded; the command's signal death
+  mimicked without a core file; inherited dispositions and mask passed on.
+- Time asleep is not counted.
+
 ### Internal
 
 - Project scaffold: Makefile with the five C safety layers and a positive

@@ -29,7 +29,12 @@ make verify-release
 
 ```
 timeout/
-├── src/main.c              # the utility
+├── src/main.c              # options, the fork, the kqueue main loop, exit status
+├── src/sigstate.c          # dispositions, the three signal groups, the counting handler, self-termination
+├── src/duration.c          # DURATION parsing (pure)
+├── src/signames.c          # signal names <-> numbers (pure)
+├── tests/unit/             # unit tests + input stress for the pure modules and self-termination
+├── tests/helpers/helper.c  # the child the e2e tests run: prints dispositions, ignores/blocks/catches signals
 ├── e2e/                    # Go tests that drive the built binary (TIMEOUT_BIN)
 ├── tests/controls/         # one planted bug per safety layer + run.sh
 ├── experiments/adr-0002/   # signal-handling experiments (probe.c, run.sh) and their raw logs
@@ -64,6 +69,12 @@ timeout/
   handler therefore counts arrivals per main-loop epoch and resets at the 8th
   (ADR-0002 revision 3); the main loop must start a new epoch after every
   `kevent` return and re-arm the handler after forwarding.
+- **macOS kills a stopped process with a default-action TERM by itself**, so a
+  stopped `sleep` proves nothing about SIGCONT; the e2e test uses a command that
+  catches TERM, which stays pending until SIGCONT (mutation-checked).
+- An e2e command that leaves a grandchild holding stdout makes Go's `Wait`
+  block until the grandchild exits; use `exec` in `sh -c` where a test times
+  the result.
 - `experiments/adr-0002/run.sh` takes minutes (thousands of forks); run it in
   the background. Its logs are timestamped and never overwritten.
 - Whether a core file was written cannot be observed from outside on this Mac

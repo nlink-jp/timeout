@@ -9,6 +9,7 @@ HDRS := $(wildcard src/*.h)
 # The pure modules the unit tests link (everything but main.c).
 LIB_SRCS := $(filter-out src/main.c,$(SRCS))
 UNIT_SRCS := $(wildcard tests/unit/*.c)
+HELPER_SRC := tests/helpers/helper.c
 
 # macOS 12 is the floor: every API used (kqueue, posix signals) is far older.
 TARGET_FLAGS := -arch arm64 -mmacosx-version-min=12.0
@@ -42,7 +43,7 @@ NOTARY_PROFILE    ?= nlink-jp-notary
 # darwin/arm64 only: Linux has GNU timeout, and Windows has no signals.
 PLATFORMS := darwin/arm64
 
-.PHONY: build build-all build-test lint controls unit test package verify-release clean help
+.PHONY: build build-all build-test helper lint controls unit test package verify-release clean help
 
 ## build: Build the shipped binary (dist/timeout)
 build: $(SRCS) $(HDRS)
@@ -66,7 +67,7 @@ build-test: $(SRCS) $(HDRS)
 
 ## lint: Static analysis; any finding fails (layer 2)
 lint:
-	@for f in $(SRCS) $(UNIT_SRCS); do \
+	@for f in $(SRCS) $(UNIT_SRCS) $(HELPER_SRC); do \
 		$(CC) --analyze -Xanalyzer -analyzer-werror $(TARGET_FLAGS) $(WARN_FLAGS) $(BOUNDS_FLAGS) \
 			"$$f" -o /dev/null || exit 1; \
 	done
@@ -78,6 +79,11 @@ controls:
 		TEST_SAN_FLAGS="$(TEST_SAN_FLAGS)" OUT="$(TEST_DIR)/controls" \
 		sh tests/controls/run.sh
 
+## helper: Build the child program the e2e tests run (dist/test/helper)
+helper: $(HELPER_SRC)
+	@mkdir -p $(TEST_DIR)
+	$(CC) $(TARGET_FLAGS) $(WARN_FLAGS) $(BOUNDS_FLAGS) -O1 $(HELPER_SRC) -o $(TEST_DIR)/helper
+
 ## unit: Unit tests and input stress for the pure modules (layer 5), test flags
 unit: $(LIB_SRCS) $(HDRS) $(UNIT_SRCS)
 	@mkdir -p $(TEST_DIR)
@@ -86,10 +92,11 @@ unit: $(LIB_SRCS) $(HDRS) $(UNIT_SRCS)
 	ASAN_OPTIONS="$(TEST_ASAN_OPTIONS)" $(TEST_DIR)/unit
 
 ## test: controls, lint, unit, then the e2e tests against the test and shipped builds
-test: controls lint unit build-test build
-	TIMEOUT_BIN="$(abspath $(TEST_DIR)/$(BINARY))" ASAN_OPTIONS="$(TEST_ASAN_OPTIONS)" \
+test: controls lint unit build-test build helper
+	TIMEOUT_BIN="$(abspath $(TEST_DIR)/$(BINARY))" TIMEOUT_HELPER="$(abspath $(TEST_DIR)/helper)" \
+		ASAN_OPTIONS="$(TEST_ASAN_OPTIONS)" go test -count=1 ./...
+	TIMEOUT_BIN="$(abspath $(DIST_DIR)/$(BINARY))" TIMEOUT_HELPER="$(abspath $(TEST_DIR)/helper)" \
 		go test -count=1 ./...
-	TIMEOUT_BIN="$(abspath $(DIST_DIR)/$(BINARY))" go test -count=1 ./...
 
 ## package: Build, archive with version suffix, and notarize. Asset naming
 ## follows the org Release Archive Standard (timeout-vX.Y.Z-darwin-arm64.zip).

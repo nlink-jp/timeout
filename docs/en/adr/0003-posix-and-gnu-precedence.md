@@ -34,6 +34,7 @@ they are listed.
 | `-f`, and `-k` sent SIGKILL | `exit(137)` | terminates itself with SIGKILL (shell sees 137 either way) | EXIT STATUS: 124 or as if `-p` — "as if `-p`" chosen |
 | `-f -s KILL`, no `-k`, no `-p` | 137 | 124 | EXIT STATUS: 124 when `-k` not given |
 | `-v` quotes | locale-dependent (‘ ’ under UTF-8) | always ASCII `'` | not specified; no locale handling (RFP §3 Out of scope) |
+| `-k` with a duration of 0, and a signal forwarded | `-k` has no effect when the main duration is 0 (manual) | `-k` starts at the forwarded signal | DESCRIPTION: a propagated signal "shall be treated as the first signal" (added 2026-09-29, found while implementing) |
 
 ### Unspecified points settled by following GNU
 
@@ -52,8 +53,9 @@ they are listed.
 - The differential tests compare against GNU and fail on any difference not in
   this table, so drift in either direction is visible.
 - Scripts that depend on one of the listed GNU behaviours see the standard's
-  behaviour instead. All five cases are corner cases (`-p` with a signal death,
-  a script run with TTIN/TTOU ignored, `-f` with SIGKILL, quote characters).
+  behaviour instead. All six cases are corner cases (`-p` with a signal death,
+  a script run with TTIN/TTOU ignored, `-f` with SIGKILL, quote characters,
+  `-k` with no time limit).
 
 ## Alternatives considered
 
