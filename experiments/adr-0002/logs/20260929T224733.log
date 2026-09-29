@@ -1,0 +1,34 @@
+# macOS 27.0 (26A428), arm64
+# Apple clang version 21.0.0 (clang-2100.3.34.2)
+# trials=300
+PASS exp1 fork window (design): blocked default: 0/300 lost
+PASS exp1 fork window (control shows loss): ignored: 296/300 lost
+PASS exp2 self-sent recorded at once: kill(getpid) then kevent(timeout 0): data=1
+PASS exp2 external sends recorded with count: 3 sends from another process: data=3
+PASS exp2 SIG_IGN discards a pending signal: pending before=1, after SIG_IGN=0
+OBSERVED SEGV sent with kill:
+  siginfo: sig=11 si_code=2 si_pid=0 si_addr=0x0
+OBSERVED real NULL dereference:
+  siginfo: sig=11 si_code=2 si_pid=0 si_addr=0x0
+PASS exp3 real fault ends the process (design): NULL dereference: killed by signal 11 in 0.006s
+PASS exp3 real fault ends the process (design): -fbounds-safety trap: killed by signal 5 in 0.006s
+PASS exp3 real fault ends the process (design): __builtin_trap: killed by signal 5 in 0.006s
+PASS exp3 real fault ends the process (design): udf (illegal instruction): killed by signal 4 in 0.006s
+PASS exp3 real fault (control shows spin): NULL dereference with SEGV ignored: still running after 2.01s (spin)
+PASS exp3 repeated sends survived (design): 2 SEGV sends 0 us apart: 0/200 died, 0/200 other
+FAIL exp3 repeated sends survived (design): 2 SEGV sends 10 us apart: 1/200 died, 0/200 other
+PASS exp3 repeated sends survived (design): 2 SEGV sends 100 us apart: 0/200 died, 0/200 other
+PASS exp3 repeated sends survived (design): 2 SEGV sends 1000 us apart: 0/200 died, 0/200 other
+PASS exp3 each synchronous signal survived (design): signal 11 sent twice, 100 us apart: exited 0 in 0.005s
+PASS exp3 each synchronous signal survived (design): signal 10 sent twice, 100 us apart: exited 0 in 0.006s
+PASS exp3 each synchronous signal survived (design): signal 4 sent twice, 100 us apart: exited 0 in 0.006s
+PASS exp3 each synchronous signal survived (design): signal 5 sent twice, 100 us apart: exited 0 in 0.006s
+PASS exp3 each synchronous signal survived (design): signal 8 sent twice, 100 us apart: exited 0 in 0.006s
+MEASURED exp3 burst: 20 SEGV sends 0 us apart: 121/200 died, 0/200 other
+MEASURED exp3 burst: 20 SEGV sends 5 us apart: 66/200 died, 0/200 other
+MEASURED exp3 burst: 20 SEGV sends 20 us apart: 6/200 died, 0/200 other
+MEASURED exp3 burst: 20 SEGV sends 50 us apart: 0/200 died, 0/200 other
+MEASURED exp3 burst: 20 SEGV sends 200 us apart: 0/200 died, 0/200 other
+PASS exp4 self-termination (design): 40/40 cases ended by signal n (others pending, no core flag)
+PASS exp4 self-termination (control shows pre-emption): unblock-all without discard, n=USR1 with HUP/TERM/USR2 pending: killed by signal 1 in 0.006s
+FAIL: 1 failure(s)

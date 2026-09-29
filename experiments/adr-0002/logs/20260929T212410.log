@@ -1,0 +1,26 @@
+# macOS 27.0 (26A428), arm64
+# Apple clang version 21.0.0 (clang-2100.3.34.2)
+# trials=300
+PASS exp1 fork window (design): blocked default: 0/300 lost
+PASS exp1 fork window (control shows loss): ignored: 283/300 lost
+PASS exp2 self-sent recorded at once: kill(getpid) then kevent(timeout 0): data=1
+PASS exp2 external sends recorded with count: 3 sends from another process: data=3
+PASS exp2 SIG_IGN discards a pending signal: pending before=1, after SIG_IGN=0
+  handler: sig=11 si_code=2
+PASS exp3 real fault ends the process (design): NULL dereference: killed by signal 11 in 0.006s
+  handler: sig=5 si_code=0
+PASS exp3 real fault ends the process (design): -fbounds-safety trap: killed by signal 5 in 0.007s
+  handler: sig=5 si_code=0
+PASS exp3 real fault ends the process (design): __builtin_trap: killed by signal 5 in 0.008s
+  handler: sig=4 si_code=2
+PASS exp3 real fault ends the process (design): udf (illegal instruction): killed by signal 4 in 0.006s
+PASS exp3 real fault (control shows spin): NULL dereference with SEGV ignored: still running after 2.01s (spin)
+  handler: sig=11 si_code=2
+  handler: sig=10 si_code=1
+  handler: sig=8 si_code=0
+  handler: sig=5 si_code=0
+  handler: sig=4 si_code=2
+PASS exp3 external send survived and recorded: 5 synchronous signals sent with kill: exited 10 in 0.007s
+PASS exp4 self-termination (design): 40/40 cases ended by signal n (others pending, no core flag)
+PASS exp4 self-termination (control shows pre-emption): unblock-all without discard, n=USR1 with HUP/TERM/USR2 pending: killed by signal 1 in 0.008s
+PASS: 0 failure(s)
