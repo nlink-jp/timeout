@@ -10,4 +10,5 @@ All notable changes to this project are documented here. The format follows
 
 - Project scaffold: Makefile with the five C safety layers and a positive
   control for each, e2e test harness, signing and Homebrew templates.
-- Specification ([RFP](docs/en/timeout-rfp.md)).
+- Specification ([RFP](docs/en/timeout-rfp.md)) and architecture decision
+  records ([ADR-0001 to ADR-0005](docs/en/adr/)).

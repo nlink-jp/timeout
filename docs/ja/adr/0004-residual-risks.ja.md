@@ -1,0 +1,54 @@
+# ADR-0004: プロセスグループ方式の残余リスクを受け入れる
+
+| Field | Value |
+|-------|-------|
+| Status | **Accepted** |
+| Date | 2026-09-29 |
+| Binds | timeout |
+| Decision makers | nlink-jp maintainers |
+| Triggered by | 他の実装が子孫全員に届かせるため、また自分と一緒に子を終わらせるために使う仕組みが macOS に無い |
+
+## Context
+
+規格は、コマンドの子孫へシグナルを届ける方法を 2 つ認めている。timeout をプロセスグループの
+先頭にしてグループへ送る方法と、孤児になった子孫の「引き取り手（reaper）」になって全員へ送る方法。
+macOS には引き取りの仕組みが無い — SDK の `usr/include` に `procctl` も
+`PR_SET_CHILD_SUBREAPER` も `PR_SET_PDEATHSIG` も無い（2026-09-29 に確認）。したがって使えるのは
+プロセスグループ方式だけで、timeout が死んだときに子を道連れにする仕組みも無い。
+
+## Decision
+
+プロセスグループ方式（ADR-0002）を使い、次のリスクを受け入れる。どれも、利用者が出会う場面の
+説明として README に書く。
+
+1. **グループを抜けた子孫には届かない。** 自分で `setsid` や `setpgid` を呼ぶ子孫（デーモン、一部の
+   ジョブ制御プログラム）はシグナルを受けない。規格の RATIONALE もこれを認めている。
+2. **timeout が SIGKILL されると子は残る。** 親の死を子へ知らせるシグナルが無い。GNU マニュアルも
+   同じ注意を書いている。
+3. **`-f` なしでは、timeout とコマンドは独自のプロセスグループに入る。**
+   - 外側（エージェントのハーネス、CI ランナー）が、timeout を起動したグループへ向けた kill は、
+     timeout にもコマンドにも届かない。時間 0 なら動き続ける。timeout 本人の pid へ送れば届き、
+     timeout が中継する。
+   - 対話的でないスクリプトから端末を読むコマンドを実行すると SIGTTIN で停止し、端末の Ctrl-C も
+     届かない。`-f` で両方を避けられるが、子孫は時間切れにならない。GNU と同じ。
+
+リスク 3 の前半は外から動かすテストで固定し、振る舞いが変われば分かるようにする。
+
+## Consequences
+
+- README に、`-f` の使いどころと、シグナルを送るべきは timeout 本人の pid であることを書く。
+- 引き取りのまね（プロセス表を定期的に調べる等）はしない。競合があり、保証の無いまま攻撃面を増やす
+  だけだからである。
+
+## Alternatives considered
+
+- **子孫を定期的に探して pid で送る。** 競合する（pid の再利用、調べる間に起動したプロセス）うえ、
+  launchd へ付け替わったデーモンは見逃す。不採用。
+- **`EVFILT_PROC` で timeout を見張り、timeout が死んだら子を殺す補助プロセス。** 補助が生きている
+  間だけリスク 2 を覆い、補助自身も SIGKILL されうる。保証の無い複雑さとして不採用。
+
+## References
+
+- POSIX.1-2024 XCU `timeout` RATIONALE
+- GNU coreutils マニュアル `timeout` invocation（`--foreground`、終了コード 137）
+- [RFP](../timeout-rfp.ja.md) §3 子孫への届け方と残余リスク

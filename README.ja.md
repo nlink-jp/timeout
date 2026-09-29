@@ -19,3 +19,4 @@ make test    # 安全策の陽性対照、静的解析、外から動かすテ�
 ## 文書
 
 - [RFP](docs/ja/timeout-rfp.ja.md) — 仕様
+- [設計判断記録（ADR）](docs/ja/adr/)

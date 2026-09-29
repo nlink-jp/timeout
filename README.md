@@ -19,3 +19,4 @@ make test    # safety-layer controls, static analysis, and the e2e tests
 ## Documentation
 
 - [RFP](docs/en/timeout-rfp.md) — the specification
+- [Architecture decision records](docs/en/adr/)
