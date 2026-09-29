@@ -88,7 +88,10 @@ Under `-fbounds-safety`, `main` takes
 `char *__null_terminated *__counted_by(argc) argv`. The NULL at `argv[argc]`
 lies outside the counted range, so the single call that hands the command's
 argument vector to `execvp` uses `__unsafe_forge_null_terminated`. No other
-`__unsafe_*` construct is allowed.
+`__unsafe_*` construct is allowed in the utility. The unit tests have one:
+the input-stress generator passes its buffer to the parsers with
+`__unsafe_null_terminated_from_indexable(buf, &buf[len])`, naming the NUL it
+just wrote.
 
 ### Writing under `-fbounds-safety` (measured 2026-09-29)
 

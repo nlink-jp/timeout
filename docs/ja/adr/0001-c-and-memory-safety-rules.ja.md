@@ -77,7 +77,9 @@ Apple clang 21 で、わざとバグを入れたコードに対して各安全�
 
 `-fbounds-safety` の下で `main` は `char *__null_terminated *__counted_by(argc) argv` を受け取る。
 `argv[argc]` の NULL は数えた範囲の外なので、コマンドの引数列を `execvp` へ渡す 1 か所だけは
-`__unsafe_forge_null_terminated` を使う。それ以外の `__unsafe_*` は使わない。
+`__unsafe_forge_null_terminated` を使う。本体ではそれ以外の `__unsafe_*` を使わない。単体テストには
+1 か所ある: 入力の揺さぶりの生成器が、自分で書いた NUL の位置を明示して
+`__unsafe_null_terminated_from_indexable(buf, &buf[len])` でバッファをパーサへ渡す。
 
 ### `-fbounds-safety` の下での書き方（2026-09-29 実測）
 
