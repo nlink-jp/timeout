@@ -44,7 +44,7 @@ static const char usage_text[] =
 	"                          even when the command times out\n"
 	"  -s, --signal=SIGNAL     the signal to send on time out (default TERM);\n"
 	"                          a name like HUP or a number\n"
-	"  -v, --verbose           report any signal sent on time out to stderr\n"
+	"  -v, --verbose           report each signal sent to COMMAND to stderr\n"
 	"      --help              display this help and exit\n"
 	"      --version           output version information and exit\n"
 	"\n"
@@ -143,9 +143,11 @@ static void report(int sig)
 }
 
 /* Send sig as the standard requires: to the child, then (without -f) to the
- * process group, followed by SIGCONT unless sig is KILL or CONT. */
+ * process group, followed by SIGCONT unless sig is KILL or CONT. -v reports
+ * every signal sent this way, forwarded ones included, as GNU does. */
 static void send_signal(int sig)
 {
+	report(sig);
 	(void)kill(child_pid, sig);
 	if (!opt_foreground) {
 		note_self_sent(sig);
@@ -210,7 +212,9 @@ static int finish(int status)
 	if (status == -1)
 		return EXIT_CANCELED;
 	if (timed_out && !opt_preserve) {
-		if (kill_after_sent)
+		/* -k's KILL: as if -p — but only if the KILL is what ended the
+		 * command, not an exit that raced it (GNU judges the same way). */
+		if (kill_after_sent && WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL)
 			sig_self_terminate(SIGKILL);
 		return EXIT_TIMEDOUT;
 	}
@@ -288,11 +292,9 @@ static int supervise(int64_t duration_ns, char *__null_terminated const *__null_
 		case EVFILT_TIMER:
 			if (ev.ident == TIMER_MAIN) {
 				timed_out = 1;
-				report(timeout_sig);
 				send_signal(timeout_sig);
 			} else if (ev.ident == TIMER_KILL) {
 				kill_after_sent = 1;
-				report(SIGKILL);
 				send_signal(SIGKILL);
 			}
 			break;
@@ -341,9 +343,14 @@ int main(int argc, char *__null_terminated *__counted_by(argc) argv)
 		case OPT_HELP:
 			fputs(usage_text, stdout);
 			return fflush(stdout) == 0 ? 0 : EXIT_CANCELED;
-		case OPT_VERSION:
-			printf("timeout version %s\n", TIMEOUT_VERSION);
+		case OPT_VERSION: {
+			char line[128] = {0};
+			int n = snprintf(line, sizeof line, "timeout version %s\n", TIMEOUT_VERSION);
+			if (n < 0 || (size_t)n >= sizeof line)
+				return EXIT_CANCELED;
+			(void)fwrite(line, 1, (size_t)n, stdout);
 			return fflush(stdout) == 0 ? 0 : EXIT_CANCELED;
+		}
 		default:
 			try_help();
 			return EXIT_CANCELED;

@@ -1,7 +1,9 @@
 package e2e
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -75,11 +77,16 @@ func TestForwardsEverySignal(t *testing.T) {
 	}
 	for _, sig := range sigs {
 		t.Run(sig.String(), func(t *testing.T) {
-			s := startTimeout(t, 300*time.Millisecond, "10", "sleep", "10")
+			pidFile := filepath.Join(t.TempDir(), "child.pid")
+			s := startTimeout(t, 300*time.Millisecond, "10", "sh", "-c", `echo $$ > `+pidFile+`; exec sleep 10`)
 			s.signal(t, sig)
 			r := s.wait(t)
 			if r.code != -1 || r.signal != sig || r.elapsed > 5*time.Second {
 				t.Fatalf("%v; want killed by %v soon", r, sig)
+			}
+			if pid := readPid(t, pidFile); alive(pid) {
+				_ = syscall.Kill(pid, syscall.SIGKILL)
+				t.Fatalf("the command (pid %d) survived; timeout did not forward %v", pid, sig)
 			}
 		})
 	}
@@ -150,4 +157,78 @@ func TestOuterGroupKillDoesNotReach(t *testing.T) {
 func isZombie(pid int) bool {
 	out, err := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output()
 	return err == nil && strings.HasPrefix(strings.TrimSpace(string(out)), "Z")
+}
+
+func readPid(t *testing.T, file string) int {
+	t.Helper()
+	b, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(b)))
+	if err != nil {
+		t.Fatalf("pid file %s: %v", file, err)
+	}
+	return pid
+}
+
+// -v reports forwarded signals too, as GNU does.
+func TestVerboseReportsForwardedSignals(t *testing.T) {
+	s := startTimeout(t, 300*time.Millisecond, "-v", "10", "sleep", "10")
+	s.signal(t, syscall.SIGHUP)
+	r := s.wait(t)
+	want := "timeout: sending signal HUP to command 'sleep'\n"
+	if r.signal != syscall.SIGHUP || r.stderr != want {
+		t.Fatalf("%v, stderr %q; want killed by SIGHUP and %q", r, r.stderr, want)
+	}
+}
+
+// What timeout sends its own group is recorded by kqueue too; it must not
+// be forwarded back. Without the subtraction timeout would echo TERM to the
+// group over and over while the command catches it.
+func TestOwnGroupSignalsAreNotForwardedBack(t *testing.T) {
+	term := strconv.Itoa(int(syscall.SIGTERM))
+	r := run(t, "-p", "0.3", "HELPER", "count", term, "2")
+	if r.code < 1 || r.code > 3 {
+		t.Fatalf("%v; want the command to see TERM once or twice (exit 1..3), not an echo", r)
+	}
+}
+
+// Without -f, timeout leads a process group of its own; with -f it stays in
+// the group it was started in.
+func TestForegroundDoesNotCreateAGroup(t *testing.T) {
+	own := syscall.Getpgrp()
+	pgidOfTimeout := func(args ...string) int {
+		t.Helper()
+		r := run(t, append(args, "sh", "-c", `ps -o pgid= -p $PPID`)...)
+		n, err := strconv.Atoi(strings.TrimSpace(r.stdout))
+		if r.code != 0 || err != nil {
+			t.Fatalf("%v, stdout %q: %v", r, r.stdout, err)
+		}
+		return n
+	}
+	if g := pgidOfTimeout("-f", "5"); g != own {
+		t.Errorf("with -f, timeout's group is %d; want the test's own %d", g, own)
+	}
+	if g := pgidOfTimeout("5"); g == own {
+		t.Errorf("without -f, timeout stayed in the test's group %d", g)
+	}
+}
+
+// timeout ignores SIGTTIN and SIGTTOU (POSIX), so it cannot be stopped by them.
+func TestIgnoresTTINandTTOU(t *testing.T) {
+	for _, sig := range []syscall.Signal{syscall.SIGTTIN, syscall.SIGTTOU} {
+		s := startTimeout(t, 300*time.Millisecond, "10", "sleep", "10")
+		s.signal(t, sig)
+		time.Sleep(200 * time.Millisecond)
+		out, _ := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(s.cmd.Process.Pid)).Output()
+		if strings.HasPrefix(strings.TrimSpace(string(out)), "T") {
+			_ = s.cmd.Process.Kill()
+			t.Fatalf("%v stopped timeout (ps stat %q)", sig, out)
+		}
+		s.signal(t, syscall.SIGTERM)
+		if r := s.wait(t); r.signal != syscall.SIGTERM {
+			t.Fatalf("after %v: %v; want killed by SIGTERM", sig, r)
+		}
+	}
 }

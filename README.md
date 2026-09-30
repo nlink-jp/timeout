@@ -20,8 +20,6 @@ of the utility, with the GNU coreutils options, so those scripts run unchanged.
   started with (only the timeout signal is reset to default), so it still
   ignores SIGHUP under `nohup`.
 - Time spent asleep is not counted, as with GNU `timeout` on Linux.
-- Written in C against libc only; built with bounds checking and checked by
-  static analysis and sanitizers.
 
 ## Installation
 
@@ -47,7 +45,7 @@ minutes, `h` hours, `d` days — `10`, `1.5m`, `2h`. `0` means no time limit.
 | `-k DUR`, `--kill-after=DUR` | Also send `KILL` if the command is still running this long after the first signal |
 | `-p`, `--preserve-status` | Exit with the command's status even when it timed out |
 | `-f`, `--foreground` | Time out the command only, not its descendants; lets it read the terminal |
-| `-v`, `--verbose` | Report each signal sent on timeout to standard error |
+| `-v`, `--verbose` | Report each signal sent to the command (on timeout, by `-k`, or forwarded) to standard error |
 | `--help`, `--version` | Show usage or version |
 
 Options come before DURATION; everything after the command name belongs to the
@@ -90,9 +88,16 @@ With `-f`, only the command itself is timed out; its children are not.
   reached.
 - If `timeout` is killed with `KILL`, the command keeps running (macOS has no
   way to take a child down with its parent).
-- Eight or more copies of the same `SEGV`, `BUS`, `ILL`, `TRAP` or `FPE` sent to
+- In a pipeline run with job control (an interactive shell, `set -m`),
+  `timeout` already leads the pipeline's process group, so the signal also
+  reaches the other commands of the pipeline.
+- Nine or more copies of the same `SEGV`, `BUS`, `ILL`, `TRAP` or `FPE` sent to
   `timeout` within an instant are taken for a crash of `timeout` itself, which
   then ends without forwarding them.
+- `-s STOP` stops `timeout` too (it is in the group it signals), and a stopped
+  `timeout` sends no `-k` KILL. Same as GNU.
+- Environment variables named `DYLD_*` do not reach the command: macOS removes
+  them from signed programs, as it does for `/usr/bin/env`, `nice` and `nohup`.
 
 ### Differences from GNU `timeout`
 

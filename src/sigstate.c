@@ -172,7 +172,12 @@ int sig_setup_parent(int kq, int timeout_sig)
 		if (kevent(kq, &reg, 1, NULL, 0, NULL) != 0)
 			return -1;
 	}
-	return sigprocmask(SIG_BLOCK, &group_a, NULL);
+	if (sigprocmask(SIG_BLOCK, &group_a, NULL) != 0)
+		return -1;
+	/* Group B must never be blocked in the parent, even if inherited so:
+	 * a real fault in timeout would then spin (ADR-0002). The child gets
+	 * the inherited mask back. */
+	return sigprocmask(SIG_UNBLOCK, &group_b, NULL);
 }
 
 int sig_block_for_fork(sigset_t *saved)
@@ -200,7 +205,8 @@ void sig_restore_child(int timeout_sig)
 
 void sig_new_epoch(void)
 {
-	loop_epoch = loop_epoch + 1;
+	/* Wrap by hand: overflowing a signed sig_atomic_t is undefined. */
+	loop_epoch = loop_epoch == SIG_ATOMIC_MAX ? 0 : loop_epoch + 1;
 }
 
 void sig_rearm(int sig)

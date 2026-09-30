@@ -16,6 +16,7 @@ All notable changes to this project are documented here. The format follows
   mimicked without a core file; inherited dispositions and mask passed on.
 - Time asleep is not counted.
 - `-s 0` and `-s EXIT` name the null signal, as GNU accepts them.
+- `-v` reports every signal sent to the command, forwarded ones included.
 
 ### Internal
 

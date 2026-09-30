@@ -9,6 +9,8 @@
  *   helper catch N               exit 40 when signal N arrives; exit 1
  *                                if it does not within 5 seconds
  *   helper setpgid-sleep S       leave the process group, sleep S seconds
+ *   helper count N S             count arrivals of signal N for S seconds,
+ *                                then exit with the count (at most 99)
  */
 #include <ptrcheck.h>
 #include <signal.h>
@@ -75,6 +77,15 @@ static void on_catch(int sig)
 	_exit(40);
 }
 
+static volatile sig_atomic_t arrivals;
+
+static void on_count(int sig)
+{
+	(void)sig;
+	if (arrivals < 99)
+		arrivals = arrivals + 1;
+}
+
 int main(int argc, char *__null_terminated *__counted_by(argc) argv)
 {
 	if (argc == 2 && strcmp(argv[1], "disp") == 0)
@@ -122,13 +133,34 @@ int main(int argc, char *__null_terminated *__counted_by(argc) argv)
 		return 1;
 	}
 
+	if (argc == 4 && strcmp(argv[1], "count") == 0) {
+		sigset_t set = {0};
+		if (parse_set(argv[2], &set) != 0)
+			return 2;
+		for (int sig = 1; sig <= 31; sig++) {
+			if (!sigismember(&set, sig))
+				continue;
+			struct sigaction sa = {0};
+			sa.sa_handler = on_count;
+			sigemptyset(&sa.sa_mask);
+			sigaction(sig, &sa, NULL);
+		}
+		sigprocmask(SIG_UNBLOCK, &set, NULL);
+		/* nanosleep returns early on each signal: sleep in short steps */
+		for (int i = 0; i < (argv[3][0] - '0') * 20; i++) {
+			struct timespec ts = { 0, 50 * 1000 * 1000 };
+			nanosleep(&ts, NULL);
+		}
+		return arrivals;
+	}
+
 	if (argc == 3 && strcmp(argv[1], "setpgid-sleep") == 0) {
 		setpgid(0, 0);
 		sleep_s(argv[2][0] - '0');
 		return 0;
 	}
 
-	fputs("usage: helper disp | ignore N,.. -- CMD | block N,.. -- CMD | catch N | setpgid-sleep S\n",
+	fputs("usage: helper disp | ignore N,.. -- CMD | block N,.. -- CMD | catch N | count N S | setpgid-sleep S\n",
 	      stderr);
 	return 2;
 }

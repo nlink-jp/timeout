@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/event.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -236,8 +237,14 @@ static int prepare_properties(void)
 	sigaddset(&term, SIGUSR1);
 	sigprocmask(SIG_BLOCK, &term, NULL);
 	kill(getpid(), SIGTERM);
-	struct rlimit big = { RLIM_INFINITY, RLIM_INFINITY };
-	(void)setrlimit(RLIMIT_CORE, &big);
+	/* Raise the limit first, or the check below would pass vacuously
+	 * (macOS starts with a soft core limit of 0). */
+	struct rlimit big = {0};
+	if (getrlimit(RLIMIT_CORE, &big) != 0)
+		return 64;
+	big.rlim_cur = big.rlim_max;
+	if (setrlimit(RLIMIT_CORE, &big) != 0 || big.rlim_cur == 0)
+		return 65;
 
 	if (sig_record_inherited() != 0)
 		return 64;
@@ -294,11 +301,55 @@ static void test_self_termination(void)
 	}
 }
 
+/* sig_setup_parent: group A blocked, group B unblocked even if inherited
+ * blocked (a real fault must not spin), TTIN ignored. Checked in a child. */
+static int setup_properties(void)
+{
+	sigset_t inherited = {0};
+	sigemptyset(&inherited);
+	sigaddset(&inherited, SIGSEGV);
+	sigprocmask(SIG_BLOCK, &inherited, NULL);
+	if (sig_record_inherited() != 0)
+		return 64;
+	int kq = kqueue();
+	if (kq < 0 || sig_setup_parent(kq, SIGTERM) != 0)
+		return 65;
+	int bad = 0;
+	sigset_t mask = {0};
+	sigprocmask(SIG_SETMASK, NULL, &mask);
+	if (sigismember(&mask, SIGSEGV))
+		bad |= 1;
+	if (!sigismember(&mask, SIGTERM) || !sigismember(&mask, SIGHUP))
+		bad |= 2;
+	struct sigaction sa = {0};
+	if (sigaction(SIGTTIN, NULL, &sa) != 0 || sa.sa_handler != SIG_IGN)
+		bad |= 4;
+	if (sigaction(SIGSEGV, NULL, &sa) != 0 || sa.sa_handler == SIG_DFL || sa.sa_handler == SIG_IGN)
+		bad |= 8;
+	return bad;
+}
+
+static void test_parent_setup(void)
+{
+	pid_t pid = fork();
+	if (pid == 0)
+		_exit(setup_properties());
+	int st = 0;
+	waitpid(pid, &st, 0);
+	if (!WIFEXITED(st) || WEXITSTATUS(st) != 0) {
+		printf("FAIL sig_setup_parent: status %d (bits: 1 SEGV still blocked, 2 group A not "
+		       "blocked, 4 TTIN not ignored, 8 SEGV without handler)\n",
+		       WIFEXITED(st) ? WEXITSTATUS(st) : -1);
+		failures++;
+	}
+}
+
 int main(void)
 {
 	test_duration_table();
 	test_signal_table();
 	test_self_termination();
+	test_parent_setup();
 	stress(200000);
 	printf("%s: %d failure(s)\n", failures ? "FAIL" : "PASS", failures);
 	return failures ? 1 : 0;
