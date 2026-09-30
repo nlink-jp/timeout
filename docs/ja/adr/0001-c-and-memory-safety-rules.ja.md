@@ -52,8 +52,10 @@ Apple clang 21 で、わざとバグを入れたコードに対して各安全�
 4. **数値変換**: `double` を整数や `timespec` にする前に `isfinite` と範囲を検査する（範囲外の
    変換は未定義動作）。時間の加算は桁あふれを検査して最大値へ丸める。`int`・`pid_t`・`size_t` の
    間の暗黙変換をしない。
-5. **fork 後の子**はシグナル設定と mask の復元、`execvp`、`_exit` だけを行う。エラーの報告は
-   固定の文言の `write` で行い、`printf` 系を呼ばない。
+5. **fork 後の子**はシグナル設定と mask の復元、kqueue を閉じる、`execvp`、`_exit` だけを行う。
+   エラーの報告は `write(2)` で行い、出すのは固定の文言、argv のコマンド名、`strerror` の定数の
+   文言だけ（プロセスは単一スレッド）。`printf` 系と stdio は使わない。（2026-09-30、リリース前の
+   検証を受けて、コードの実際に合わせて明文化。）
 6. **シグナルハンドラ**は同期で起きうる 5 種（ADR-0002）にだけ置き、`sigaction` 以外を呼ばず、
    自分の自動変数と、シグナル処理部の `volatile sig_atomic_t` の到着回数記録（添字は範囲を
    検査してから使う）以外に触れない。（2026-09-29、回数記録を必要とする ADR-0002 第 3 版に
@@ -79,7 +81,8 @@ Apple clang 21 で、わざとバグを入れたコードに対して各安全�
 `argv[argc]` の NULL は数えた範囲の外なので、コマンドの引数列を `execvp` へ渡す 1 か所だけは
 `__unsafe_forge_null_terminated` を使う。本体ではそれ以外の `__unsafe_*` を使わない。単体テストには
 1 か所ある: 入力の揺さぶりの生成器が、自分で書いた NUL の位置を明示して
-`__unsafe_null_terminated_from_indexable(buf, &buf[len])` でバッファをパーサへ渡す。
+`__unsafe_null_terminated_from_indexable(buf, &buf[len])` でバッファをパーサへ渡す。外から動かす
+テストの補助プログラム（`tests/helpers/helper.c`）には、本体と同じ `execvp` の例外がある。
 
 ### `-fbounds-safety` の下での書き方（2026-09-29 実測）
 

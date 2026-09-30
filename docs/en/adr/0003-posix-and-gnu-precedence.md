@@ -34,6 +34,7 @@ they are listed.
 | `-f`, and `-k` sent SIGKILL | `exit(137)` | terminates itself with SIGKILL (shell sees 137 either way) | EXIT STATUS: 124 or as if `-p` — "as if `-p`" chosen |
 | `-f -s KILL`, no `-k`, no `-p` | 137 | 124 | EXIT STATUS: 124 when `-k` not given |
 | `-v` quotes | locale-dependent (‘ ’ under UTF-8) | always ASCII `'` | not specified; no locale handling (RFP §3 Out of scope) |
+| `-s CHLD` | never returns (observed with 9.7) | 124 once the command exits after the limit | not specified; returning is the only useful behaviour (added 2026-09-30; not in `make test-gnu`, which would hang) |
 
 ### Unspecified points settled by following GNU
 
@@ -49,7 +50,11 @@ they are listed.
   `dtimespec_bound` (ADR-0005).
 - Option parsing uses GNU's optstring `"+fk:ps:v"` and long options, with
   unambiguous abbreviations.
-- `-v` message text: `timeout: sending signal NAME to command 'CMD'`.
+- `-v` message text: `timeout: sending signal NAME to command 'CMD'`, for
+  every signal sent — the timeout's, `-k`'s KILL, and forwarded ones (GNU
+  reports forwarded signals too; found by the release review, 2026-09-30).
+- `-f -k`: the run ends by KILL only if the KILL is what ended the command; a
+  command that exited just before gives 124, as GNU judges.
 
 ### Platform differences, not departures
 
@@ -69,7 +74,8 @@ with no signal at all. The row was removed. The oracle is GNU coreutils 9.7
 ## Consequences
 
 - The differential tests compare against GNU and fail on any difference not in
-  this table, so drift in either direction is visible.
+  this table, so drift in either direction is visible. Every row but `-s CHLD`
+  is exercised there, standard error included for `-v`.
 - Scripts that depend on one of the listed GNU behaviours see the standard's
   behaviour instead. All five cases are corner cases (`-p` with a signal death,
   a script run with TTIN/TTOU ignored, `-f` with SIGKILL, quote characters).

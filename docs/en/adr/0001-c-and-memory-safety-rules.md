@@ -58,9 +58,12 @@ each enforced by a machine check.
    `double` becomes an integer or a `timespec` (an out-of-range conversion is
    undefined behaviour). Additions of durations are checked for overflow and
    clamped. No implicit conversions among `int`, `pid_t` and `size_t`.
-5. **The forked child** only restores signal dispositions and the mask, calls
-   `execvp`, and `_exit`s. Its error report is a `write` of fixed text; no
-   `printf` family.
+5. **The forked child** only restores signal dispositions and the mask,
+   closes the kqueue, calls `execvp`, and `_exit`s. Its error report is
+   `write(2)` of fixed text, the command name from argv and `strerror`'s
+   constant text (the process is single-threaded); no `printf` family and no
+   stdio. (Amended 2026-09-30 to state what the code does, after the release
+   review.)
 6. **Signal handlers** exist only for the five synchronous signals (ADR-0002),
    call nothing but `sigaction`, and touch only their own automatic variables
    and the signal module's `volatile sig_atomic_t` arrival counters, indexed
@@ -91,7 +94,8 @@ argument vector to `execvp` uses `__unsafe_forge_null_terminated`. No other
 `__unsafe_*` construct is allowed in the utility. The unit tests have one:
 the input-stress generator passes its buffer to the parsers with
 `__unsafe_null_terminated_from_indexable(buf, &buf[len])`, naming the NUL it
-just wrote.
+just wrote. The e2e helper (`tests/helpers/helper.c`) has the same `execvp`
+exception as the utility.
 
 ### Writing under `-fbounds-safety` (measured 2026-09-29)
 

@@ -40,6 +40,7 @@ timeout/
 ├── tests/controls/         # one planted bug per safety layer + run.sh
 ├── tests/gnu/              # runner.pl (same cases on both sides), compare.pl, expected-differences.txt
 ├── experiments/adr-0002/   # signal-handling experiments (probe.c, run.sh) and their raw logs
+├── experiments/adr-0005/   # the sleep measurement (measure.sh) and its log
 ├── scripts/                # vendored org templates (signing, notarize, brew) — do not edit
 ├── docs/{en,ja}/           # RFP and ADRs
 └── Makefile
@@ -86,6 +87,12 @@ timeout/
   duration is 0" read as a difference, but GNU 9.7 starts -k at a forwarded
   signal just as POSIX says (ADR-0003, Correction). Check GNU claims with
   `make test-gnu`, not the manual.
+- **The shipped (Developer ID, Hardened Runtime) build drops `DYLD_*` from the
+  environment the command inherits** — as macOS does for `/usr/bin/env`. Kept
+  that way on purpose (README Limits); the entitlement that would pass them
+  also lets them into timeout itself.
+- **`ps -o sigmask` shows 0 on macOS** even for a process with blocked signals
+  (masks are per thread): check masks in a unit test, not through `ps`.
 - `experiments/adr-0002/run.sh` takes minutes (thousands of forks); run it in
   the background. Its logs are timestamped and never overwritten.
 - Whether a core file was written cannot be observed from outside on this Mac

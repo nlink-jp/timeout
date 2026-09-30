@@ -1,7 +1,7 @@
 # RFP: timeout
 
 > Generated: 2026-09-29
-> Status: Draft (revision 3 — second independent verification applied; time asleep is no longer counted)
+> Status: Accepted (revision 3, approved 2026-09-29; corrected during implementation — see the ADRs)
 
 ## 1. Problem Statement
 
@@ -31,7 +31,7 @@ timeout --help | --version
 |-------|-----------------------|---------|
 | `-f` | `--foreground` | Time out the command itself only. No process group is created, so the command can read the terminal from a script and receives the terminal's Ctrl-C. Descendants are not timed out; SIGCONT is not sent |
 | `-p` | `--preserve-status` | On timeout, return the command's status instead of 124 |
-| `-k duration` | `--kill-after=duration` | Send SIGKILL if the command is still alive this long after the first signal. No effect if either duration is 0 |
+| `-k duration` | `--kill-after=duration` | Send SIGKILL if the command is still alive this long after the first signal — the timeout's or a forwarded one, even with a duration of 0 (as GNU). No effect if the `-k` duration is 0 |
 | `-s signal` | `--signal=signal` | Signal to send on timeout (default TERM). Names are case-insensitive, `SIG` prefix optional; numbers 0–31 are accepted (macOS numbers; 0 and `EXIT` are the null signal, as GNU) |
 | `-v` | `--verbose` | Report the signal sent on timeout to standard error |
 | — | `--help` / `--version` | Usage (stdout, exit 0) / version (stdout, exit 0) |

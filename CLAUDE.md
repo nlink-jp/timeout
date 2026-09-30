@@ -20,7 +20,8 @@ behind it are the ADRs in `docs/{en,ja}/adr/`.
     `sprintf`/`gets`; check every `snprintf` result; range-check every index;
   - no dynamic allocation;
   - check `isfinite` and the range before any `double` → integer conversion;
-  - the forked child only restores signal state, calls `execvp` and `_exit`s;
+  - the forked child only restores signal state, closes the kqueue, calls
+    `execvp` and `_exit`s, reporting errors with `write(2)` only;
   - signal handlers exist only for the five synchronous signals, call
     nothing but `sigaction`, and touch only their automatic variables and the
     `volatile sig_atomic_t` arrival counters.
