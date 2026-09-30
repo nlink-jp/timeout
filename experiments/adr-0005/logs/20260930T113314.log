@@ -1,0 +1,16 @@
+# macOS 27.0 (26A428), arm64
+# timeout version 0ca8c1e
+start: 2026-09-30 11:33:15 — put the Mac to sleep now, and wake it after at least 3 minutes.
+end:   2026-09-30 11:37:52, exit status 124
+# pmset -g log, Sleep / Wake / DarkWake between start and end:
+  2026-09-30 11:33:24 +0900 Sleep               	Entering Sleep state due to 'Software Sleep pid=444':TCPKeepAlive=activ
+  2026-09-30 11:33:33 +0900 DarkWake            	DarkWake from Deep Idle [CDNP] : due to smc.sysState.Wake(0x70070000) w
+  2026-09-30 11:33:55 +0900 Sleep               	Entering Sleep state due to 'Maintenance Sleep':TCPKeepAlive=active Usi
+  2026-09-30 11:36:40 +0900 Wake                	Wake from Deep Idle [CDNVA] : due to smc.sysState.Wake(0x70070000) usb3
+wall 277s, asleep 174s, awake 103s, ended 72s after the last wake
+FAIL (or not measured: asleep must be at least 180s)
+# appended after the run (2026-09-30 11:38), read-only:
+# kern.sleeptime: { sec = 1790735639, usec = 478471 } Wed Sep 30 11:33:59 2026
+# kern.waketime: { sec = 1790735796, usec = 921895 } Wed Sep 30 11:36:36 2026
+# kern.sleep_abs_time: 9812811259925
+# kern.wake_abs_time: 9812813459649
