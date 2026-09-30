@@ -23,11 +23,20 @@ of the utility, with the GNU coreutils options, so those scripts run unchanged.
 
 ## Installation
 
-Build from source (Apple silicon, macOS 12 or later):
+Apple silicon, macOS 12 or later.
 
 ```bash
-make build            # dist/timeout
-cp dist/timeout /usr/local/bin/
+brew install nlink-jp/tap/timeout
+```
+
+Or download `timeout-v<version>-darwin-arm64.zip` from the
+[Releases](https://github.com/nlink-jp/timeout/releases) page (signed and
+notarized), or build from source:
+
+```bash
+git clone https://github.com/nlink-jp/timeout.git
+cd timeout
+make build            # → dist/timeout
 ```
 
 ## Usage

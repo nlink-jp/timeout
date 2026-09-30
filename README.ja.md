@@ -21,11 +21,19 @@ macOS には `timeout` コマンドが無いため、Linux 向けに書かれた
 
 ## インストール
 
-ソースからビルドする（Apple シリコン、macOS 12 以降）:
+Apple シリコン、macOS 12 以降。
 
 ```bash
-make build            # dist/timeout
-cp dist/timeout /usr/local/bin/
+brew install nlink-jp/tap/timeout
+```
+
+または[リリースページ](https://github.com/nlink-jp/timeout/releases)から
+`timeout-v<version>-darwin-arm64.zip`（署名・公証済み）を入手するか、ソースからビルドする:
+
+```bash
+git clone https://github.com/nlink-jp/timeout.git
+cd timeout
+make build            # → dist/timeout
 ```
 
 ## 使い方
