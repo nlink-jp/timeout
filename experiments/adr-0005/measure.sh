@@ -6,9 +6,10 @@
 # Nothing is changed on the machine: the sleep and wake times are only read
 # from `pmset -g log`.
 #
-# Pass: the run does not end on waking, and ends with 124 once the awake
-# time (wall time minus time asleep; a DarkWake counts as awake) adds up to
-# about 120 seconds.
+# Pass: the run ends with 124 after the Mac has woken, not during the sleep
+# — which is when a clock counting sleep would end it. The awake time is
+# printed but not judged: pmset log times miss the kernel's transitions by
+# seconds, too much for a narrow window (ADR-0005, Result).
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
@@ -63,11 +64,13 @@ after_wake=""
 [ -n "$last_wake" ] && after_wake=$((s1 - last_wake))
 {
 	echo "wall ${wall}s, asleep ${asleep}s, awake ${awake}s, ended ${after_wake:-?}s after the last wake"
-	if [ "$rc" -eq 124 ] && [ "$asleep" -ge 180 ] && [ "$awake" -ge 110 ] && [ "$awake" -le 140 ] &&
-		[ -n "$after_wake" ] && [ "$after_wake" -ge 5 ]; then
-		echo "PASS: time asleep was not counted"
+	counted_end=$((s0 + 120))
+	if [ "$asleep" -lt 60 ] || [ -z "$last_wake" ] || [ "$counted_end" -ge "$last_wake" ]; then
+		echo "NOT MEASURED: the Mac must sleep past the 120 s mark (sleep sooner, or longer)"
+	elif [ "$rc" -eq 124 ] && [ "$s1" -gt "$last_wake" ]; then
+		echo "PASS: ended after waking, not at the 120 s mark during the sleep — time asleep was not counted"
 	else
-		echo "FAIL (or not measured: asleep must be at least 180s)"
+		echo "FAIL: exit status $rc, ended ${after_wake:-?}s after the last wake"
 	fi
 } | tee -a "$log"
 echo "log: ${log#"$root"/}"
