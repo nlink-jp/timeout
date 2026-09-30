@@ -32,6 +32,11 @@ TEST_ASAN_OPTIONS := handle_segv=0:handle_sigbus=0:handle_sigfpe=0
 
 VERSION_FLAG := -DTIMEOUT_VERSION='"$(VERSION)"'
 
+# The oracle for make test-gnu: GNU coreutils timeout on Debian 13 (arm64),
+# pinned by digest (coreutils 9.7). Used only as the comparison, never shipped.
+GNU_IMAGE    := docker.io/library/debian@sha256:1808211ab6f37c6fc6a75368651697536f7bf47993f2797befa8908b1254979d
+GNU_PLATFORM := linux/arm64
+
 # macOS Developer ID signing / notarization (see nlink-jp/.github
 # CONVENTIONS.md §Code Signing). Defaults match any Developer ID
 # Application cert in the keychain and the org-standard notary
@@ -43,7 +48,7 @@ NOTARY_PROFILE    ?= nlink-jp-notary
 # darwin/arm64 only: Linux has GNU timeout, and Windows has no signals.
 PLATFORMS := darwin/arm64
 
-.PHONY: build build-all build-test helper lint controls unit test package verify-release clean help
+.PHONY: build build-all build-test helper lint controls unit test test-gnu package verify-release clean help
 
 ## build: Build the shipped binary (dist/timeout)
 build: $(SRCS) $(HDRS)
@@ -97,6 +102,16 @@ test: controls lint unit build-test build helper
 		ASAN_OPTIONS="$(TEST_ASAN_OPTIONS)" go test -count=1 ./...
 	TIMEOUT_BIN="$(abspath $(DIST_DIR)/$(BINARY))" TIMEOUT_HELPER="$(abspath $(TEST_DIR)/helper)" \
 		go test -count=1 ./...
+
+## test-gnu: Compare outcomes with GNU timeout in a Linux container (podman).
+## Fails, never skips, when podman or the image is unavailable.
+test-gnu: build
+	@command -v podman >/dev/null 2>&1 || { echo "test-gnu: FAIL — podman is required"; exit 1; }
+	@mkdir -p $(TEST_DIR)
+	TIMEOUT="$(abspath $(DIST_DIR)/$(BINARY))" perl tests/gnu/runner.pl > $(TEST_DIR)/gnu-ours.txt
+	podman run --rm --platform $(GNU_PLATFORM) -v "$(abspath tests/gnu):/gnu:ro" $(GNU_IMAGE) \
+		sh -c 'TIMEOUT=/usr/bin/timeout perl /gnu/runner.pl' > $(TEST_DIR)/gnu-theirs.txt
+	perl tests/gnu/compare.pl tests/gnu/expected-differences.txt $(TEST_DIR)/gnu-ours.txt $(TEST_DIR)/gnu-theirs.txt
 
 ## package: Build, archive with version suffix, and notarize. Asset naming
 ## follows the org Release Archive Standard (timeout-vX.Y.Z-darwin-arm64.zip).

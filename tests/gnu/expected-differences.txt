@@ -1,0 +1,8 @@
+# Differences from GNU coreutils timeout that are expected (ADR-0003).
+# id <TAB> ours <TAB> GNU <TAB> why. compare.pl fails on any other difference,
+# and on any of these not observed exactly as written.
+f-s-KILL	exit:124	exit:137	ADR-0003: -f -s KILL without -k exits 124 (POSIX EXIT STATUS)
+f-k	sig:KILL	exit:137	ADR-0003: -f and -k's SIGKILL: as if -p (self-terminate)
+p-signal	sig:TERM	exit:143	ADR-0003: -p mimics a signal death by self-termination
+preserve-status	sig:TERM	exit:143	ADR-0003: as p-signal, with the long option
+s-64	exit:125	exit:124	platform: Linux has signals up to 64; macOS stops at 31

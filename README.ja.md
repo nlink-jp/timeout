@@ -96,7 +96,6 @@ GNU が POSIX.1-2024 と食い違う箇所では、この `timeout` は規格に
   （GNU は 128+n で終わる）。
 - コマンドの SIGTTIN・SIGTTOU は受け継いだまま（GNU は既定動作に戻す）。
 - `-f -s KILL` は 124 で終わる（GNU は 137）。
-- `-k` は、シグナルを中継したときにも始まる。時間が 0 でも同じ（GNU では無効）。
 - `-v` の引用符は常に `'`。
 
 差分の一覧は [ADR-0003](docs/ja/adr/0003-posix-and-gnu-precedence.ja.md) にある。
@@ -108,6 +107,7 @@ Xcode（Apple clang）と、テスト用に Go が必要。
 ```bash
 make build   # dist/timeout
 make test    # 安全策の陽性対照、静的解析、単体テスト、外から動かすテスト
+make test-gnu  # Linux コンテナ内の GNU timeout と結果を突き合わせる（podman）
 ```
 
 ## 文書

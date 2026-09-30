@@ -129,6 +129,10 @@ func TestSignalOption(t *testing.T) {
 		{"--signal=int", "0.3", "sleep", "5"},
 		{"--signal", "SIGINT", "0.3", "sleep", "5"},
 		{"-s", "2", "0.3", "sleep", "5"},
+		// the null signal (GNU accepts 0 and EXIT): nothing is delivered,
+		// so the command runs out and the run still counts as timed out
+		{"-s", "0", "0.3", "sleep", "0.6"},
+		{"-s", "sigexit", "0.3", "sleep", "0.6"},
 	} {
 		r := run(t, args...)
 		if r.code != 124 {

@@ -20,7 +20,8 @@ make build      # dist/timeout — shipped flags, signed if a Developer ID is pr
 make build-test # dist/test/timeout — ASan + UBSan + bounds safety + pattern init
 make lint       # clang --analyze; any finding fails
 make controls   # proves each safety layer fails on a planted bug
-make test       # controls + lint + e2e against dist/test/timeout AND dist/timeout
+make test       # controls + lint + unit + e2e against dist/test/timeout AND dist/timeout
+make test-gnu   # outcomes vs GNU coreutils timeout 9.7 in podman (Debian 13, pinned by digest)
 make package    # dist/timeout-<version>-darwin-arm64.zip, notarized
 make verify-release
 ```
@@ -37,6 +38,7 @@ timeout/
 ├── tests/helpers/helper.c  # the child the e2e tests run: prints dispositions, ignores/blocks/catches signals
 ├── e2e/                    # Go tests that drive the built binary (TIMEOUT_BIN)
 ├── tests/controls/         # one planted bug per safety layer + run.sh
+├── tests/gnu/              # runner.pl (same cases on both sides), compare.pl, expected-differences.txt
 ├── experiments/adr-0002/   # signal-handling experiments (probe.c, run.sh) and their raw logs
 ├── scripts/                # vendored org templates (signing, notarize, brew) — do not edit
 ├── docs/{en,ja}/           # RFP and ADRs
@@ -75,6 +77,15 @@ timeout/
 - An e2e command that leaves a grandchild holding stdout makes Go's `Wait`
   block until the grandchild exits; use `exec` in `sh -c` where a test times
   the result.
+- **`make test-gnu` is a release gate and fails without podman** (never skips).
+  A difference not in `tests/gnu/expected-differences.txt` fails it; so does a
+  listed one that stops appearing. Those listed rows are also its positive
+  control (comparing a file with itself fails). Compare only platform-neutral
+  outcomes: `-s` by number only where Linux and macOS agree (1 2 9 15).
+- **The GNU manual is not GNU's behaviour**: "-k has no effect if the main
+  duration is 0" read as a difference, but GNU 9.7 starts -k at a forwarded
+  signal just as POSIX says (ADR-0003, Correction). Check GNU claims with
+  `make test-gnu`, not the manual.
 - `experiments/adr-0002/run.sh` takes minutes (thousands of forks); run it in
   the background. Its logs are timestamped and never overwritten.
 - Whether a core file was written cannot be observed from outside on this Mac

@@ -11,8 +11,9 @@ struct signame {
 	const char *name;
 };
 
-/* Every signal macOS defines (signal(3)), by number. */
+/* The null signal and every signal macOS defines (signal(3)), by number. */
 static const struct signame signames[] = {
+	{ 0, "EXIT" }, /* the null signal: sending it does nothing */
 	{ SIGHUP, "HUP" },       { SIGINT, "INT" },       { SIGQUIT, "QUIT" },
 	{ SIGILL, "ILL" },       { SIGTRAP, "TRAP" },     { SIGABRT, "ABRT" },
 	{ SIGEMT, "EMT" },       { SIGFPE, "FPE" },       { SIGKILL, "KILL" },
@@ -63,7 +64,7 @@ static const char *skip_sig_prefix(const char *s)
 	return s;
 }
 
-/* A decimal number from 1 to 31, or -1. Digits only; at most two. */
+/* A decimal number from 0 to 31, or -1. Digits only; at most two. */
 static int parse_number(const char *s)
 {
 	int value = 0;
@@ -74,7 +75,7 @@ static int parse_number(const char *s)
 		value = value * 10 + (*s - '0');
 		digits++;
 	}
-	if (digits == 0 || value < 1 || value > 31)
+	if (digits == 0 || value > 31)
 		return -1;
 	return value;
 }

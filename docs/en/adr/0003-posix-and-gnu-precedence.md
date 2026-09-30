@@ -34,10 +34,13 @@ they are listed.
 | `-f`, and `-k` sent SIGKILL | `exit(137)` | terminates itself with SIGKILL (shell sees 137 either way) | EXIT STATUS: 124 or as if `-p` — "as if `-p`" chosen |
 | `-f -s KILL`, no `-k`, no `-p` | 137 | 124 | EXIT STATUS: 124 when `-k` not given |
 | `-v` quotes | locale-dependent (‘ ’ under UTF-8) | always ASCII `'` | not specified; no locale handling (RFP §3 Out of scope) |
-| `-k` with a duration of 0, and a signal forwarded | `-k` has no effect when the main duration is 0 (manual) | `-k` starts at the forwarded signal | DESCRIPTION: a propagated signal "shall be treated as the first signal" (added 2026-09-29, found while implementing) |
 
 ### Unspecified points settled by following GNU
 
+- `-s 0` and `-s EXIT` (any case, `SIG` prefix optional) name the null
+  signal: nothing is delivered, and the run ends 124 once the command exits
+  after the time limit. The standard does not require accepting 0; GNU does
+  (found by the differential test, 2026-09-30).
 - SIGCONT is sent after every signal except SIGKILL (not with `-f`), not only
   to a stopped child.
 - The signal is sent to the child's pid directly and then to the group.
@@ -48,14 +51,28 @@ they are listed.
   unambiguous abbreviations.
 - `-v` message text: `timeout: sending signal NAME to command 'CMD'`.
 
+### Platform differences, not departures
+
+- Signal numbers above 31 are rejected: macOS has no signal 32 or above, where
+  Linux has real-time signals up to 64 (`-s 64` is valid for GNU on Linux).
+
+### Correction (2026-09-30)
+
+A sixth row — "`-k` with a duration of 0, when a signal is forwarded: GNU,
+no effect" — was added on 2026-09-29 from the GNU manual's sentence "This
+option has no effect if either the main duration … is 0". The differential
+test showed GNU 9.7 does start `-k` at a forwarded signal, as the standard
+requires and as this project does; the manual's sentence covers the case
+with no signal at all. The row was removed. The oracle is GNU coreutils 9.7
+(Debian 13); the manual read was 9.12's.
+
 ## Consequences
 
 - The differential tests compare against GNU and fail on any difference not in
   this table, so drift in either direction is visible.
 - Scripts that depend on one of the listed GNU behaviours see the standard's
-  behaviour instead. All six cases are corner cases (`-p` with a signal death,
-  a script run with TTIN/TTOU ignored, `-f` with SIGKILL, quote characters,
-  `-k` with no time limit).
+  behaviour instead. All five cases are corner cases (`-p` with a signal death,
+  a script run with TTIN/TTOU ignored, `-f` with SIGKILL, quote characters).
 
 ## Alternatives considered
 

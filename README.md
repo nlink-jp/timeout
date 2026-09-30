@@ -102,8 +102,6 @@ Where GNU departs from POSIX.1-2024, this `timeout` follows the standard:
   signal (GNU exits 128+n).
 - The command keeps SIGTTIN and SIGTTOU as inherited (GNU resets them).
 - `-f -s KILL` exits 124 (GNU: 137).
-- `-k` also starts when a signal is forwarded, even with a duration of 0 (GNU:
-  no effect).
 - `-v` always quotes with `'`.
 
 The full table is in [ADR-0003](docs/en/adr/0003-posix-and-gnu-precedence.md).
@@ -115,6 +113,7 @@ Requires Xcode (Apple clang) and Go (for the tests only).
 ```bash
 make build   # dist/timeout
 make test    # safety-layer controls, static analysis, unit tests, e2e tests
+make test-gnu  # compare outcomes with GNU timeout in a Linux container (podman)
 ```
 
 ## Documentation

@@ -32,7 +32,7 @@ timeout --help | --version
 | `-f` | `--foreground` | Time out the command itself only. No process group is created, so the command can read the terminal from a script and receives the terminal's Ctrl-C. Descendants are not timed out; SIGCONT is not sent |
 | `-p` | `--preserve-status` | On timeout, return the command's status instead of 124 |
 | `-k duration` | `--kill-after=duration` | Send SIGKILL if the command is still alive this long after the first signal. No effect if either duration is 0 |
-| `-s signal` | `--signal=signal` | Signal to send on timeout (default TERM). Names are case-insensitive, `SIG` prefix optional; numbers are accepted (macOS numbers) |
+| `-s signal` | `--signal=signal` | Signal to send on timeout (default TERM). Names are case-insensitive, `SIG` prefix optional; numbers 0–31 are accepted (macOS numbers; 0 and `EXIT` are the null signal, as GNU) |
 | `-v` | `--verbose` | Report the signal sent on timeout to standard error |
 | — | `--help` / `--version` | Usage (stdout, exit 0) / version (stdout, exit 0) |
 

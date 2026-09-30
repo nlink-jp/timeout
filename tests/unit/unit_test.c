@@ -118,7 +118,10 @@ static void test_signal_table(void)
 	check_signal("1", 1);
 	check_signal("31", 31);
 	check_signal("01", 1);
-	check_signal("0", -1);
+	check_signal("0", 0);
+	check_signal("00", 0);
+	check_signal("EXIT", 0);
+	check_signal("sigexit", 0);
 	check_signal("32", -1);
 	check_signal("001", -1);
 	check_signal("-9", -1);
@@ -132,15 +135,15 @@ static void test_signal_table(void)
 	check_signal("TER", -1);
 
 	/* every name round-trips */
-	for (int n = 1; n <= 31; n++) {
+	for (int n = 0; n <= 31; n++) {
 		const char *__null_terminated name = signal_name(n);
 		if (name == NULL || parse_signal(name) != n) {
 			printf("FAIL round trip for signal %d\n", n);
 			failures++;
 		}
 	}
-	if (signal_name(0) != NULL || signal_name(32) != NULL || signal_name(-1) != NULL) {
-		printf("FAIL signal_name outside 1..31 is not NULL\n");
+	if (signal_name(32) != NULL || signal_name(-1) != NULL) {
+		printf("FAIL signal_name outside 0..31 is not NULL\n");
 		failures++;
 	}
 }
@@ -208,7 +211,7 @@ static void stress(int rounds)
 		int ok = (rc == 0 && ns >= 0 && ns <= DURATION_MAX_NS) || (rc == -1 && ns == 0);
 
 		int sig = parse_signal(in);
-		ok = ok && (sig == -1 || (sig >= 1 && sig <= 31));
+		ok = ok && (sig == -1 || (sig >= 0 && sig <= 31));
 		if (sig != -1) {
 			const char *__null_terminated name = signal_name(sig);
 			ok = ok && name != NULL && parse_signal(name) == sig;

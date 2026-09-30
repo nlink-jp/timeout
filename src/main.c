@@ -159,7 +159,7 @@ static void send_signal(int sig)
 	if (!first_signal_sent) {
 		first_signal_sent = 1;
 		/* POSIX: a forwarded signal also counts as the first signal,
-		 * even with a duration of 0 (ADR-0003). */
+		 * even with a duration of 0 (GNU does the same). */
 		if (kill_after_ns > 0 && sig != SIGKILL && arm_timer(TIMER_KILL, kill_after_ns) != 0)
 			fail("cannot arm the kill-after timer", strerror(errno));
 	}

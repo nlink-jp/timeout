@@ -15,10 +15,14 @@ All notable changes to this project are documented here. The format follows
   signal; every terminating signal forwarded; the command's signal death
   mimicked without a core file; inherited dispositions and mask passed on.
 - Time asleep is not counted.
+- `-s 0` and `-s EXIT` name the null signal, as GNU accepts them.
 
 ### Internal
 
 - Project scaffold: Makefile with the five C safety layers and a positive
   control for each, e2e test harness, signing and Homebrew templates.
+- `make test-gnu`: the same cases run against this `timeout` and GNU
+  coreutils `timeout` 9.7 in a Linux container; only the differences listed in
+  ADR-0003 are allowed.
 - Specification ([RFP](docs/en/timeout-rfp.md)) and architecture decision
   records ([ADR-0001 to ADR-0005](docs/en/adr/)).
