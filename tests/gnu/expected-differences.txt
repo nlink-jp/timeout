@@ -6,3 +6,5 @@ f-k	sig:KILL	exit:137	ADR-0003: -f and -k's SIGKILL: as if -p (self-terminate)
 p-signal	sig:TERM	exit:143	ADR-0003: -p mimics a signal death by self-termination
 preserve-status	sig:TERM	exit:143	ADR-0003: as p-signal, with the long option
 s-64	exit:125	exit:124	platform: Linux has signals up to 64; macOS stops at 31
+v-utf8-quotes	exit:124 stderr=timeout: sending signal TERM to command 'sleep'\n	exit:124 stderr=timeout: sending signal TERM to command ‘sleep’\n	ADR-0003: -v always quotes with ASCII ', whatever the locale
+ttin-inherited-ignored	exit:0	exit:124	ADR-0003: SIGTTIN inherited as ignored stays ignored in the command (GNU resets it, so the command stops)

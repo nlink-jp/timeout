@@ -78,11 +78,20 @@ lint:
 	done
 	@echo "lint: ok"
 
-## controls: Prove each safety layer fails on a planted bug
+## controls: Prove each safety layer fails on a planted bug, and that the
+## build rules really carry each layer's flags
 controls:
 	@CC="$(CC)" WARN_FLAGS="$(WARN_FLAGS)" BOUNDS_FLAGS="$(BOUNDS_FLAGS)" \
 		TEST_SAN_FLAGS="$(TEST_SAN_FLAGS)" OUT="$(TEST_DIR)/controls" \
 		sh tests/controls/run.sh
+	@check() { rule=$$1; shift; out=$$($(MAKE) -s -n -f $(firstword $(MAKEFILE_LIST)) $$rule 2>/dev/null); \
+		for f in "$$@"; do printf '%s' "$$out" | grep -q -e "$$f" || { \
+			echo "controls: FAIL make $$rule does not pass $$f"; exit 1; }; done; \
+		echo "controls: ok   make $$rule passes $$*"; }; \
+	check build -Werror -fbounds-safety -D_FORTIFY_SOURCE=2 -fstack-protector-strong && \
+	check build-test -Werror -fbounds-safety -fno-sanitize-recover=all -ftrivial-auto-var-init=pattern && \
+	check unit -Werror -fbounds-safety -fno-sanitize-recover=all && \
+	check lint -analyzer-werror
 
 ## helper: Build the child program the e2e tests run (dist/test/helper)
 helper: $(HELPER_SRC)

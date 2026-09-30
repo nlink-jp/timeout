@@ -95,11 +95,21 @@ my @cases = (
 	[ 'double-dash', '--', '5', 'true' ],
 	[ 'minus0-as-option', '-0', 'true' ],
 
-	# signals sent to timeout while it runs: { send => SIGNAL, after => seconds }
+	# A leading hash sets up the run:
+	#   send => SIGNAL, after => SECONDS   send SIGNAL to timeout while it runs
+	#   stderr => 1                        compare standard error too
+	#   env => { NAME => VALUE }           extra environment
+	#   ignore => [ SIGNAL... ]            start timeout with these ignored
+	[ 'v-timeout', { stderr => 1 }, '-v', '0.2', 'sleep', '5' ],
+	[ 'v-forward', { stderr => 1, send => 'HUP', after => 0.3 }, '-v', '10', 'sleep', '5' ],
+	[ 'v-kill-after', { stderr => 1 }, '-v', '-k', '0.2', '0.2', 'sh', '-c', $ignore_term ],
+	[ 'v-utf8-quotes', { stderr => 1, env => { LANG => 'C.UTF-8', LC_ALL => 'C.UTF-8' } },
+		'-v', '0.2', 'sleep', '5' ],
+	[ 'ttin-inherited-ignored', { ignore => ['TTIN'] }, '2', 'sh', '-c', 'kill -TTIN $$; exit 0' ],
 	[ 'fwd-TERM', { send => 'TERM', after => 0.3 }, '5', 'sleep', '5' ],
 	[ 'fwd-USR1-no-limit', { send => 'USR1', after => 0.3 }, '0', 'sleep', '5' ],
 	[ 'fwd-k-no-limit', { send => 'TERM', after => 0.3 }, '-k', '0.3', '0', 'sh', '-c', q{trap "" TERM; exec sleep 2} ],
-	[ 's-0-verbose-name', '-s', 'EXIT', '0.2', 'sleep', '1' ],
+	[ 's-0-verbose-name', { stderr => 1 }, '-v', '-s', 'EXIT', '0.2', 'sleep', '1' ],
 
 	# durations with a limit that trips at once
 	[ 'tiny', '--', '1e-9', 'sleep', '5' ],
@@ -123,22 +133,37 @@ print "# cases\t", scalar(@cases), "\n";
 
 for my $c (@cases) {
 	my ($id, @args) = @$c;
-	my $send = ref $args[0] eq 'HASH' ? shift @args : undef;
+	my $opt = ref $args[0] eq 'HASH' ? shift @args : {};
+	my $errfile = "$dir/stderr";
+	unlink $errfile;
 	my $pid = fork;
 	die "fork: $!\n" unless defined $pid;
 	if ($pid == 0) {
 		open STDIN, '<', '/dev/null';
 		open STDOUT, '>', '/dev/null';
-		open STDERR, '>', '/dev/null';
+		open STDERR, '>', ($opt->{stderr} ? $errfile : '/dev/null');
+		$ENV{$_} = $opt->{env}{$_} for keys %{ $opt->{env} || {} };
+		$SIG{$_} = 'IGNORE' for @{ $opt->{ignore} || [] };
 		exec { $timeout } $timeout, @args;
 		exit 99;
 	}
-	if ($send) {
-		select(undef, undef, undef, $send->{after});
-		kill $send->{send}, $pid;
+	if ($opt->{send}) {
+		select(undef, undef, undef, $opt->{after});
+		kill $opt->{send}, $pid;
 	}
 	waitpid $pid, 0;
 	my $st = $?;
 	my $outcome = ($st & 127) ? 'sig:' . $signame[$st & 127] : 'exit:' . ($st >> 8);
+	if ($opt->{stderr}) {
+		my $err = '';
+		if (open my $fh, '<', $errfile) {
+			local $/;
+			$err = <$fh> // '';
+		}
+		$err =~ s/\\/\\\\/g;
+		$err =~ s/\n/\\n/g;
+		$err =~ s/\t/\\t/g;
+		$outcome .= " stderr=$err";
+	}
 	print "$id\t$outcome\n";
 }
