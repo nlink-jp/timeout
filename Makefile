@@ -48,7 +48,7 @@ NOTARY_PROFILE    ?= nlink-jp-notary
 # darwin/arm64 only: Linux has GNU timeout, and Windows has no signals.
 PLATFORMS := darwin/arm64
 
-.PHONY: build build-all build-test helper lint controls unit test test-gnu package verify-release clean help
+.PHONY: build build-all build-test helper lint controls unit test test-gnu package verify-release clean help vuln
 
 ## build: Build the shipped binary (dist/timeout)
 build: $(SRCS) $(HDRS)
@@ -122,9 +122,16 @@ test-gnu: build
 		sh -c 'TIMEOUT=/usr/bin/timeout perl /gnu/runner.pl' > $(TEST_DIR)/gnu-theirs.txt
 	perl tests/gnu/compare.pl tests/gnu/expected-differences.txt $(TEST_DIR)/gnu-ours.txt $(TEST_DIR)/gnu-theirs.txt
 
+## vuln: known vulnerabilities in the modules and the standard library this
+## build uses (govulncheck). `package` depends on it, so a release cannot be
+## built past a finding. It needs the network, and its database changes under
+## an unchanged tree: a finding can appear without a commit.
+vuln:
+	govulncheck ./...
+
 ## package: Build, archive with version suffix, and notarize. Asset naming
 ## follows the org Release Archive Standard (timeout-vX.Y.Z-darwin-arm64.zip).
-package: build-all
+package: vuln build-all
 	@cd $(DIST_DIR) && for p in $(PLATFORMS); do os=$${p%/*}; arch=$${p#*/}; \
 		stage=_pkg; rm -rf $$stage; mkdir -p $$stage; \
 		cp "$(BINARY)-$$os-$$arch" "$$stage/$(BINARY)"; \

@@ -23,6 +23,7 @@ make controls   # proves each safety layer fails on a planted bug
 make test       # controls + lint + unit + e2e against dist/test/timeout AND dist/timeout
 make test-gnu   # outcomes vs GNU coreutils timeout 9.7 in podman (Debian 13, pinned by digest)
 make package    # dist/timeout-<version>-darwin-arm64.zip, notarized
+make vuln            # govulncheck over the build; `make package` runs it first and stops on a finding
 make verify-release
 ```
 
